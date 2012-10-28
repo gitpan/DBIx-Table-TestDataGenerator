@@ -1,0 +1,4 @@
+Revision history for DBIx-Table-TestDataGenerator
+
+0.001    28th October 2012
+         First version, supports Oracle, PostgreSQL and SQLite.

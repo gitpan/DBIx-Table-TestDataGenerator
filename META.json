@@ -1,0 +1,70 @@
+{
+   "abstract" : "Automatic test data creation, cross DBMS",
+   "author" : [
+      "JosÃ© Diaz Seng <josediazseng@gmx.de>"
+   ],
+   "dynamic_config" : 1,
+   "generated_by" : "Module::Build version 0.4002, CPAN::Meta::Converter version 2.120921",
+   "license" : [
+      "perl_5"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : "2"
+   },
+   "name" : "DBIx-Table-TestDataGenerator",
+   "prereqs" : {
+      "build" : {
+         "requires" : {
+            "Test::More" : "0"
+         }
+      },
+      "configure" : {
+         "requires" : {
+            "Module::Build" : "0.4"
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "perl" : "5.006"
+         }
+      }
+   },
+   "provides" : {
+      "DBIx::Table::TestDataGenerator" : {
+         "file" : "lib/DBIx/Table/TestDataGenerator.pm",
+         "version" : "0.001"
+      },
+      "DBIx::Table::TestDataGenerator::DBDriverUtils" : {
+         "file" : "lib/DBIx/Table/TestDataGenerator/DBDriverUtils.pm",
+         "version" : 0
+      },
+      "DBIx::Table::TestDataGenerator::TableProbe" : {
+         "file" : "lib/DBIx/Table/TestDataGenerator/TableProbe.pm",
+         "version" : 0
+      },
+      "DBIx::Table::TestDataGenerator::TableProbe::Oracle" : {
+         "file" : "lib/DBIx/Table/TestDataGenerator/TableProbe/Oracle.pm",
+         "version" : 0
+      },
+      "DBIx::Table::TestDataGenerator::TableProbe::Postgres" : {
+         "file" : "lib/DBIx/Table/TestDataGenerator/TableProbe/Postgres.pm",
+         "version" : 0
+      },
+      "DBIx::Table::TestDataGenerator::TableProbe::SQLite" : {
+         "file" : "lib/DBIx/Table/TestDataGenerator/TableProbe/SQLite.pm",
+         "version" : 0
+      },
+      "DBIx::Table::TestDataGenerator::TreeUtils" : {
+         "file" : "lib/DBIx/Table/TestDataGenerator/TreeUtils.pm",
+         "version" : 0
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://dev.perl.org/licenses/"
+      ]
+   },
+   "version" : "0.001"
+}

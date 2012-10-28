@@ -1,0 +1,320 @@
+NAME
+    DBIx::Table::TestDataGenerator - Automatic test data creation, cross
+    DBMS
+
+VERSION
+    Version 0.0.1
+
+SYNOPSIS
+        use DBIx::Table::TestDataGenerator;
+
+        my $generator = DBIx::Table::TestDataGenerator->new(
+                dbh                => $dbi_database_handle,
+                schema             => $schema_name,
+                table              => $target_table_name,
+        );
+
+        #simple usage:
+        $generator->create({
+            target_size    => $target_size,
+            num_random     => $num_random,
+            seed           => $seed,
+        });
+
+        #extended usage handling a self-reference of the target table:
+        $generator->create({
+                target_size    => $target_size,
+                num_random     => $num_random,
+                seed           => $seed,
+                max_tree_depth => $max_tree_depth,
+                min_children   => $min_children,
+                min_roots      => $min_roots,
+        });
+
+
+        #instantiation using a custom DBMS handling class
+        my $generator = DBIx::Table::TestDataGenerator->new(
+                dbh                => $dbi_database_handle,
+                schema             => $schema_name,
+                table              => $target_table_name,
+                custom_probe_class => $custom_probe_class_name,
+        );
+
+DESCRIPTION
+    There is often the need to create test data in database tables, e.g. to
+    test database client performance. The existence of constraints on a
+    table makes it non-trivial to come up with a way to add records to it.
+
+    The current module inspects the tables' constraints and adds a desired
+    number of records. The values of the fields either come from the table
+    itself (possibly incremented to satisfy uniqueness constraints) or from
+    tables referenced by foreign key constraints. The choice of the copied
+    values is random for a number of runs the user can choose, afterwards
+    the values are chosen randomly from a cache, reducing database traffic
+    for performance reasons. The user can define seeds for the randomization
+    to be able to reproduce a test run. One nice thing about this way to
+    construct new records is that at least at first sight, the added data
+    looks like real data, at least as real as the data initially present in
+    the table was.
+
+    A main goal of the module is to reduce configuration to the absolute
+    minimum by automatically determining information about the target table,
+    in particular its constraints. Another goal is to support as many DBMSs
+    as possible. Currently Oracle, PostgreSQL and SQLite are supported,
+    further DBMSs are in the work and one can add further databases or
+    change the default behaviour by writing a class satisfying the role
+    defined in DBIx::Table::TestDataGenerator::TableProbe.pm.
+
+    In the synopsis, an extended usage has been mentioned. This refers to
+    the common case of having a self-reference on a table, i.e. a one-column
+    wide foreign key of a table to itself where the referenced column
+    constitutes the primary key. Such a parent-child relationship defines a
+    rootless tree and when generating test data it may be useful to have
+    some control over the growth of this tree. One such case is when the
+    parent-child relation represents a navigation tree and a client
+    application processes this structure. In this case, one would like to
+    have a meaningful, balanced tree structure since this corresponds to
+    real-world examples. To control tree creation the parameters
+    max_tree_depth, min_children and min_roots are provided. Note that the
+    nodes are being added in a depth-first manner.
+
+SUBROUTINES/METHODS
+  new
+    Arguments:
+
+    *   dbh: required DBI database handle
+
+    *   schema: optional database schema name
+
+    *   table: required name of the target table
+
+    *   custom_probe_class: optional custom probe class name
+
+    Return value:
+
+    a new TestDataGenerator object
+
+    Creates a new TestDataGenerator object. If the DBMS in question does not
+    support the concept of a schema, the corresponding argument may be
+    omitted. If a DBMS currently not supported by
+    DBI::Table::TestDataGenerator is to be supported, or the behaviour of
+    the current TableProbe class responsible for handling the DBMS must be
+    changed, one may provide the optional custom_probe_class parameter.
+    custom_probe_class being the name of a custom class impersonating the
+    TableProbe role.
+
+  dbh
+    Accessor for the DBI database handle.
+
+  schema
+    Accessor for the database schema name.
+
+  table
+    Accessor for the name of the target table.
+
+  custom_probe_class
+    Accessor for the name of a custom class impersonating the TableProbe
+    role.
+
+  create_testdata
+    This is the main method, it creates and adds new records to the target
+    table. In case one of the arguments max_tree_depth, min_children or
+    min_roots has been provided, the other two must be provided as well.
+
+    Arguments:
+
+    *   target_size
+
+        The target number of rows to be reached.
+
+    *   num_random
+
+        The first $num_random number of records use fresh random choices for
+        their values taken from tables referenced by foreign key relations
+        or the target table itself. These values are stored in a cache and
+        re-used for the remaining (target_size - $num_random) records. Note
+        that even for the remaining records there is some randomness since
+        the combination of cached values coming from columns involved in
+        different constraints is random.
+
+    *   seed
+
+        This value must be an integer. In case it has been provided, the
+        random selections done by the Perl code as well as those done by the
+        database (where supported, e.g. not for SQLite) are seeded by this
+        value resp. a value based on this value, e.g. PostgreSQL accepting
+        only floating numbers between 0 and 1. This allows for reproducible
+        test runs.
+
+    *   max_tree_depth
+
+        In case of a self-reference, the maximum depth at which new records
+        will be inserted. The minimum value for this parameter is 2.
+
+    *   min_children
+
+        In case of a self-reference, the minimum number of children each
+        handled parent node will get. A possible exception is the last
+        handled parent node if the execution stops before $min_children
+        child nodes have been added to it.
+
+    *   min_roots
+
+        In case of a self-reference, the minimum number of root elements
+        existing after completion of the call to create_testdata. A record
+        is considered to be a root element if the corresponding parent id is
+        null or equal to the child id.
+
+    Returns:
+
+    Nothing, only called for the side-effect of adding new records to the
+    target table. (This may change, see the section FURTHER DEVELOPMENT.)
+
+INSTALLATION AND CONFIGURATION
+    To install this module, run the following commands:
+
+            perl Build.PL
+            ./Build
+            ./Build test
+            ./Build install
+
+    When installing from CPAN, the install tests look for the environment
+    variables TDG_DSN (connection string), TDG_USER (user), TDG_PWD
+    (password) and TDG_SCHEMA (schema) which may be used to test the
+    installation against an existing database. If TDG_DSN is found, the
+    install will try to use this connection string and the tests will fail
+    if no valid database connection can be established. If TDG_DSN is not
+    found, the installation creates an in-memory SQLite database provided
+    for free by the DBD::SQLite module and tests against this database.
+
+DATABASE VERSIONS TESTED AGAINST
+    *   SQLite 3.7.14.1
+
+    *   Oracle 11g XE
+
+    *   PostgreSQL 9.2.1
+
+ENVIRONMENTS TESTED IN
+    The module has been tested on a Windows 7 32-bit machine, both on
+    Windows using Strawberry Perl 5.16.1.1 and on a VirtualBox image of
+    Fedora-17-x86 running on the same Windows machine.
+
+LIMITATIONS
+    *   Currently, the module executes the inserts in one big transaction if
+        the database handle has not set AutoCommit to true, but this will
+        change, see the section FURTHER DEVELOPMENT.
+
+    *   Only uniqueness and foreign key constraints are taken into account.
+        Constraints such as check constraints, which are very diverse and
+        database specific, are not handled (and most probably will not be).
+
+    *   Uniqueness constraints involving only columns which the DBMS
+        specific TableProbe role handler does not know how to increment
+        cannot be handled. Typically, all string and numeric data types are
+        supported and the set of supported data types is defined by the list
+        provided by the TableProbe role method
+        get_type_preference_for_incrementing(). I am thinking about allowing
+        date incrementation, too, it would be necessary then to at least add
+        a configuration parameter defining what time incrementation step to
+        use.
+
+    *   When calling create_testdata, max_tree_depth = 1 should be allowed,
+        too, meaning that all new records will be root records.
+
+    *   Added records that are root node with respect to the self-reference
+        always have the parent id equal to their pkey. It may be that in the
+        case in question the convention is such that root nodes are
+        identified by having the parent id set to NULL.
+
+FURTHER DEVELOPMENT
+    *   Currently the module is using DBI and plain SQL. For the first
+        version I am fine with it since I am used to writing and reading SQL
+        and I wanted to focus on other things first, but I am aware that
+        this may not be the best solution. I will most certainly refactor
+        this, but only after having added a few more DBMSs (see the
+        following bullet point).
+
+    *   Further DBMSs are in the work, only widespread DBMSs having a DBD
+        driver on CPAN have been considered. DBMSs where the concept of a
+        constraint does not exist are not interesting since in this case it
+        is trivial to add records to a target table, so e.g. Excel or csv
+        files will not be supported. Additional databases planned to be
+        supported in the upcoming versions will be MySQL, MS SQL Server (via
+        DBD::ODBC), MS Access, DB2, FireBird and Informix.
+
+    *   One can add custom classes to change the behaviour of the module or
+        to support further DBMSs. But part of the creation of new records
+        cannot be easily modified (see the next bullet point). I will try to
+        improve this situation and make it easier to override behaviour.
+
+    *   The current version handles uniqueness constraints by picking out a
+        column involved in the constraint and incrementing it appropriately.
+        While one may do something different in a custom TableProbe class
+        than incrementing and even if the values are being incremented, the
+        calculation of the increment may be different, one is constrained to
+        handling the single selected column.
+
+    *   Support for transactions and specifying transaction sizes will be
+        added soon.
+
+    *   It will be possible to get the SQL source of all generated inserts
+        without having them executed on the database.
+
+ACKNOWLEDGEMENTS
+    A big thank you to all perl coders on the dbi-dev, DBIx-Class and
+    perl-modules mailing lists and on PerlMonks who have patiently answered
+    my questions and offered solutions, advice and encouragement, the Perl
+    community is really outstanding.
+
+    Special thanks go to Tim Bunce (module name / advice on keeping the
+    module extensible), Jonathan Leffler (module naming discussion /
+    relation to existing modules / multiple suggestions for features), brian
+    d foy (module naming discussion / mailing lists / encouragement) and the
+    following Perl monks (see the threads for user jds17 for details):
+    chromatic, erix, technojosh, kejohm, Khen1950fx, salva, tobyink (3 of 4
+    discussion threads!), Your Mother.
+
+AUTHOR
+    Jos\x{00E9} Diaz Seng, "<josediazseng at gmx.de>"
+
+BUGS
+    Please report any bugs or feature requests to
+    "bug-dbix-table-testdatagenerator at rt.cpan.org", or through the web
+    interface at
+    <http://rt.cpan.org/NoAuth/ReportBug.html?Queue=DBIx-Table-TestDataGener
+    ator>. I will be notified, and then you'll automatically be notified of
+    progress on your bug as I make changes.
+
+SUPPORT
+    You can find documentation for this module with the perldoc command.
+
+        perldoc DBIx::Table::TestDataGenerator
+
+    You can also look for information at:
+
+    *   RT: CPAN's request tracker (report bugs here)
+
+        <http://rt.cpan.org/NoAuth/Bugs.html?Dist=DBIx-Table-TestDataGenerat
+        or>
+
+    *   AnnoCPAN: Annotated CPAN documentation
+
+        <http://annocpan.org/dist/DBIx-Table-TestDataGenerator>
+
+    *   CPAN Ratings
+
+        <http://cpanratings.perl.org/d/DBIx-Table-TestDataGenerator>
+
+    *   Search CPAN
+
+        <http://search.cpan.org/dist/DBIx-Table-TestDataGenerator/>
+
+LICENSE AND COPYRIGHT
+    Copyright 2012 Jos\x{00E9} Diaz Seng.
+
+    This program is free software; you can redistribute it and/or modify it
+    under the terms of either: the GNU General Public License as published
+    by the Free Software Foundation; or the Artistic License.
+
+    See http://dev.perl.org/licenses/ for more information.
+
