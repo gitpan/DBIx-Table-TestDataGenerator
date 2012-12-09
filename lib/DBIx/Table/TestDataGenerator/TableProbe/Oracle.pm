@@ -16,11 +16,30 @@ use Readonly;
 Readonly my $COMMA         => q{,};
 Readonly my $QUESTION_MARK => q{?};
 
+{
+    my $user;
+
+    sub _user {
+        my ($self) = @_;
+        return $user if defined $user;
+        my %table_info = %{ DBIx::Admin::TableInfo->new(
+                dbh   => $self->dbh,
+                table => uc $self->table
+            )->info()
+        };
+        my %table_attributes =
+          %{ $table_info{ uc $self->table }->{attributes} };
+        $user = $table_attributes{'TABLE_SCHEM'};
+        return $user;
+    }
+}
+
 sub column_names {
     my ($self) = @_;
+	my $user = $self->_user();
     my $info = DBIx::Admin::TableInfo->new(
         dbh    => $self->dbh,
-        schema => uc $self->schema,
+        schema => $user,
         table  => uc $self->table
     )->info();
     return [ keys ${$info}{ uc $self->table }{'columns'} ];
@@ -28,11 +47,10 @@ sub column_names {
 
 sub num_roots {
     my ( $self, $pkey_col, $parent_pkey_col ) = @_;
-    my $table  = $self->table;
-    my $schema = $self->schema;
-    my $sql    = <<"END_SQL";
+    my $table = $self->table;
+    my $sql   = <<"END_SQL";
 SELECT COUNT($parent_pkey_col)
-FROM $schema.$table
+FROM $table
 WHERE $pkey_col = $parent_pkey_col OR $parent_pkey_col IS NULL
 END_SQL
     my $sth = $self->dbh->prepare($sql);
@@ -50,11 +68,10 @@ sub seed {
 
 sub random_record {
     my ( $self, $table, $colname_list ) = @_;
-    my $schema = $self->schema;
-    my $sql    = <<"END_SQL";
+    my $sql = <<"END_SQL";
 SELECT $colname_list
 FROM (
-  SELECT * FROM $schema.$table ORDER BY DBMS_RANDOM.VALUE
+  SELECT * FROM $table ORDER BY DBMS_RANDOM.VALUE
 )
 WHERE ROWNUM = 1
 END_SQL
@@ -68,7 +85,7 @@ sub get_incrementor {
         my $suffix = 'A' x $max;
         return sub {
             return $suffix . $i++;
-            }
+          }
     }
     if ( $type =~ /NUMBER/ ) {
         return sub { return ++$max };
@@ -77,12 +94,12 @@ sub get_incrementor {
         croak 'cannot handle unique constraints having only date columns';
     }
     croak
-        "I do not know how to increment unique constraint column of type $type";
+      "I do not know how to increment unique constraint column of type $type";
 }
 
 sub get_type_preference_for_incrementing {
     my @types = qw(INTEGER INT SMALLINT NUMBER NUMERIC FLOAT DEC DECIMAL
-        REAL DOUBLEPRECISION CHAR NCHAR NVARCHAR2 VARCHAR2 LONG);
+      REAL DOUBLEPRECISION CHAR NCHAR NVARCHAR2 VARCHAR2 LONG);
     return \@types;
 }
 
@@ -91,7 +108,8 @@ sub unique_columns_with_max {
 
     my $sql;
     my $table_name = uc $self->table;
-    my $schema     = uc $self->schema;
+    my $user       = $self->_user();
+
     if ($get_pkey_columns) {
 
         #Note: we need to exclude columns which are also part of
@@ -102,12 +120,12 @@ FROM all_indexes i, all_constraints c,
     all_cons_columns cc, user_tab_columns tc
 WHERE  i.index_name = c.constraint_name
        AND c.constraint_type = 'P'
-       AND c.owner = '$schema'
+       AND c.owner = '$user'
        AND i.uniqueness = 'UNIQUE'
        AND i.table_name = '$table_name'
-       AND i.table_owner = '$schema'
+       AND i.table_owner = '$user'
        AND cc.constraint_name = C.constraint_name
-       AND cc.owner = '$schema'
+       AND cc.owner = '$user'
        AND tc.table_name = i.table_name
        AND tc.column_name = cc.column_name
        AND cc.column_name NOT IN (
@@ -120,7 +138,7 @@ WHERE  i.index_name = c.constraint_name
           JOIN (
             SELECT constraint_name
             FROM all_constraints
-            WHERE OWNER = '$schema' AND constraint_type IN ('R', 'U')
+            WHERE OWNER = '$user' AND constraint_type IN ('R', 'U')
             ) c1
             ON cc1.constraint_name = c1.constraint_name
        )
@@ -134,12 +152,12 @@ FROM all_indexes i, all_constraints c,
     all_cons_columns cc, user_tab_columns tc
 WHERE  i.index_name = c.constraint_name
        AND c.constraint_type <> 'P'
-       AND c.owner = '$schema'
+       AND c.owner = '$user'
        AND i.uniqueness = 'UNIQUE'
        AND i.table_name = '$table_name'
-       AND i.table_owner = '$schema'
+       AND i.table_owner = '$user'
        AND cc.constraint_name = C.constraint_name
-       AND cc.owner = '$schema'
+       AND cc.owner = '$user'
        AND tc.table_name = i.table_name
        AND tc.column_name = cc.column_name
 END_SQL
@@ -163,7 +181,7 @@ END_SQL
 
         my $max_sql = <<"END_SQL";
 SELECT $max_expr{$data_type}
-FROM $schema.$table_name
+FROM $table_name
 END_SQL
 
         my $max_sth = $self->dbh->prepare($max_sql);
@@ -177,23 +195,23 @@ END_SQL
 sub fkey_name_to_fkey_table {
     my ($self)     = @_;
     my $table_name = uc $self->table;
-    my $schema     = uc $self->schema;
+    my $user     =  $self->_user();
     my $sql        = <<"END_SQL";
 SELECT DISTINCT ac0.constraint_name
 FROM sys.all_cons_columns c0, sys.all_constraints ac0
 WHERE  c0.table_name = '$table_name'
-       AND c0.owner = '$schema'
+       AND c0.owner = '$user'
        AND c0.constraint_name = ac0.constraint_name
        AND ac0.constraint_type = 'R'
-       AND ac0.owner = '$schema'
+       AND ac0.owner = '$user'
        AND NOT EXISTS
           ( SELECT COUNT (c.column_name), c.constraint_name
             FROM sys.all_cons_columns c, sys.all_constraints ac
             WHERE  c.table_name = '$table_name'
-                   AND c.owner = '$schema'
+                   AND c.owner = '$user'
                    AND C.constraint_name = AC.constraint_name
                    AND ac.constraint_type = 'R'
-                   AND ac.owner = '$schema'
+                   AND ac.owner = '$user'
                    AND c0.column_name IN (SELECT column_name
                                           FROM sys.all_cons_columns
                                           WHERE constraint_name = ac.constraint_name)
@@ -217,8 +235,8 @@ FROM   user_constraints a
        user_constraints b
      ON  a.constraint_name = B.R_constraint_name
          AND B.constraint_name = UPPER('$fkey_name')
-         AND a.owner = '$schema'
-         AND b.owner = '$schema'
+         AND a.owner = '$user'
+         AND b.owner = '$user'
 END_SQL
 
         $sth = $self->dbh->prepare($sql);
@@ -231,7 +249,7 @@ END_SQL
 
 sub fkey_referenced_cols_to_referencing_cols {
     my ($self) = @_;
-    my $schema = uc $self->schema;
+    my $user = $self->_user();
     my $sql    = <<"END_SQL";
 SELECT CC2.COLUMN_NAME AS cons_col, CC1.COLUMN_NAME AS ref_col
 FROM sys.all_cons_columns cc1, sys.user_constraints uc, sys.all_cons_columns cc2
@@ -239,9 +257,9 @@ WHERE  CC1.constraint_name = UC.constraint_name
        AND UC.R_constraint_name = CC2.constraint_name
        AND cc1.constraint_name = ?
        AND CC1.POSITION = cc2.position
-       AND CC1.OWNER = '$schema'
-       AND cc2.owner = '$schema'
-       AND uc.owner = '$schema'
+       AND CC1.OWNER = '$user'
+       AND cc2.owner = '$user'
+       AND uc.owner = '$user'
 ORDER BY cc1.position
 END_SQL
     my $sth = $self->dbh->prepare($sql);
@@ -266,7 +284,7 @@ END_SQL
 
 sub fkey_referenced_cols {
     my ( $self, $fkey_tables ) = @_;
-    my $schema = uc $self->schema;
+    my $user = $self->_user();
     my $sql    = <<"END_SQL";
 SELECT CC2.COLUMN_NAME AS cons_col
 FROM sys.all_cons_columns cc1, sys.user_constraints uc, sys.all_cons_columns cc2
@@ -274,9 +292,9 @@ WHERE  CC1.constraint_name = UC.constraint_name
        AND UC.R_constraint_name = CC2.constraint_name
        AND cc1.constraint_name = ?
        AND CC1.POSITION = cc2.position
-       AND CC1.OWNER = '$schema'
-       AND cc2.owner = '$schema'
-       AND uc.owner = '$schema'
+       AND CC1.OWNER = '$user'
+       AND cc2.owner = '$user'
+       AND uc.owner = '$user'
 ORDER BY cc1.position
 END_SQL
     my $sth = $self->dbh->prepare($sql);
@@ -301,7 +319,7 @@ END_SQL
 
 sub get_self_reference {
     my ( $self, $fkey_tables, $pkey_col_name ) = @_;
-    my $schema = uc $self->schema;
+    my $user = $self->_user();
     my $sql    = <<"END_SQL";
 SELECT CC2.COLUMN_NAME AS cons_col, CC1.COLUMN_NAME AS ref_col
 FROM sys.all_cons_columns cc1, sys.user_constraints uc, sys.all_cons_columns cc2
@@ -309,9 +327,9 @@ WHERE  CC1.constraint_name = UC.constraint_name
        AND UC.R_constraint_name = CC2.constraint_name
        AND cc1.constraint_name = ?
        AND CC1.POSITION = cc2.position
-       AND CC1.OWNER = '$schema'
-       AND cc2.owner = '$schema'
-       AND uc.owner = '$schema'
+       AND CC1.OWNER = '$user'
+       AND cc2.owner = '$user'
+       AND uc.owner = '$user'
 ORDER BY cc1.position
 END_SQL
     my $sth = $self->dbh->prepare($sql);
@@ -382,11 +400,11 @@ For TableProbe role methods, see the documentation of L<TableProbe|DBIx::Table::
 
 =head1 AUTHOR
 
-Jos\x{00E9} Diaz Seng, C<< <josediazseng at gmx.de> >>
+Jose Diaz Seng, C<< <josediazseng at gmx.de> >>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2012 Jos\x{00E9} Diaz Seng.
+Copyright 2012 Jose Diaz Seng.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published

@@ -4,7 +4,7 @@ use Moo;
 use strict;
 use warnings;
 
-our $VERSION = "0.001";
+our $VERSION = "0.002";
 $VERSION = eval $VERSION;
 
 use Carp;
@@ -495,21 +495,21 @@ Version 0.0.1
     );
 
     #simple usage:
-    $generator->create({
+    $generator->create_testdata(
         target_size    => $target_size,
         num_random     => $num_random,
         seed           => $seed,
-    });
+    );
 
     #extended usage handling a self-reference of the target table:
-    $generator->create({
+    $generator->create_testdata(
             target_size    => $target_size,
             num_random     => $num_random,
             seed           => $seed,
             max_tree_depth => $max_tree_depth,
             min_children   => $min_children,
             min_roots      => $min_roots,
-    });
+    );
 
 
     #instantiation using a custom DBMS handling class
@@ -526,7 +526,7 @@ There is often the need to create test data in database tables, e.g. to test dat
 
 The current module inspects the tables' constraints and adds a desired number of records. The values of the fields either come from the table itself (possibly incremented to satisfy uniqueness constraints) or from tables referenced by foreign key constraints. The choice of the copied values is random for a number of runs the user can choose, afterwards the values are chosen randomly from a cache, reducing database traffic for performance reasons. The user can define seeds for the randomization to be able to reproduce a test run. One nice thing about this way to construct new records is that at least at first sight, the added data looks like real data, at least as real as the data initially present in the table was.
 
-A main goal of the module is to reduce configuration to the absolute minimum by automatically determining information about the target table, in particular its constraints. Another goal is to support as many DBMSs as possible. Currently Oracle, PostgreSQL and SQLite are supported, further DBMSs are in the work and one can add further databases or change the default behaviour by writing a class satisfying the role defined in DBIx::Table::TestDataGenerator::TableProbe.pm. 
+A main goal of the module is to reduce configuration to the absolute minimum by automatically determining information about the target table, in particular its constraints. Another goal is to support as many DBMSs as possible. Currently Oracle, PostgreSQL and SQLite are supported, further DBMSs are in the work and one can add further databases or change the default behaviour by writing a class satisfying the role defined in DBIx::Table::TestDataGenerator::TableProbe.pm. NOTE: A major refactoring is on its way, see section FURTHER DEVELOPMENT.
 
 In the synopsis, an extended usage has been mentioned. This refers to the common case of having a self-reference on a table, i.e. a one-column wide foreign key of a table to itself where the referenced column constitutes the primary key. Such a parent-child relationship defines a rootless tree and when generating test data it may be useful to have some control over the growth of this tree. One such case is when the parent-child relation represents a navigation tree and a client application processes this structure. In this case, one would like to have a meaningful, balanced tree structure since this corresponds to real-world examples. To control tree creation the parameters max_tree_depth, min_children and min_roots are provided. Note that the nodes are being added in a depth-first manner.
 
@@ -633,7 +633,7 @@ When installing from CPAN, the install tests look for the environment variables 
 
 =head1 ENVIRONMENTS TESTED IN
 
-The module has been tested on a Windows 7 32-bit machine, both on Windows using Strawberry Perl 5.16.1.1 and on a VirtualBox image of Fedora-17-x86 running on the same Windows machine.
+The module has been tested on a Windows 7 32-bit machine under Strawberry Perl 5.16.1.1 and in an Ubuntu 12.04 VirtualBox image using perlbrew with naked Perl versions 5.17.6 and 5.10.1.
 
 =head1 LIMITATIONS
 
@@ -655,15 +655,11 @@ The module has been tested on a Windows 7 32-bit machine, both on Windows using 
 
 =over 4
 
-=item * Currently the module is using DBI and plain SQL. For the first version I am fine with it since I am used to writing and reading SQL and I wanted to focus on other things first, but I am aware that this may not be the best solution. I will most certainly refactor this, but only after having added a few more DBMSs (see the following bullet point).
-
-=item * Further DBMSs are in the work, only widespread DBMSs having a DBD driver on CPAN have been considered. DBMSs where the concept of a constraint does not exist are not interesting since in this case it is trivial to add records to a target table, so e.g. Excel or csv files will not be supported. Additional databases planned to be supported in the upcoming versions will be MySQL, MS SQL Server (via DBD::ODBC), MS Access, DB2, FireBird and Informix.
-
-=item * One can add custom classes to change the behaviour of the module or to support further DBMSs. But part of the creation of new records cannot be easily modified (see the next bullet point). I will try to improve this situation and make it easier to override behaviour.
+=item * A major refactoring planned to be released with version 0.003 is in the works where I want to remove database specific handling with the help of DBIx::Class. Even if some DBMS specifics are left, this will help to support a broad range of DBMSs and the matureness of DBIx::Class will certainly help to keep the number of bugs low.
 
 =item * The current version handles uniqueness constraints by picking out a column involved in the constraint and incrementing it appropriately. While one may do something different in a custom TableProbe class than incrementing and even if the values are being incremented, the calculation of the increment may be different, one is constrained to handling the single selected column.
 
-=item * Support for transactions and specifying transaction sizes will be added soon.
+=item * Support for transactions and specifying transaction sizes will be added.
 
 =item * It will be possible to get the SQL source of all generated inserts without having them executed on the database.
 
@@ -671,13 +667,23 @@ The module has been tested on a Windows 7 32-bit machine, both on Windows using 
 
 =head1 ACKNOWLEDGEMENTS
 
+=over 4
+
+=item * Version 0.001:
+
 A big thank you to all perl coders on the dbi-dev, DBIx-Class and perl-modules mailing lists and on PerlMonks who have patiently answered my questions and offered solutions, advice and encouragement, the Perl community is really outstanding.
 
 Special thanks go to Tim Bunce (module name / advice on keeping the module extensible), Jonathan Leffler (module naming discussion / relation to existing modules / multiple suggestions for features), brian d foy (module naming discussion / mailing lists / encouragement) and the following Perl monks (see the threads for user jds17 for details): chromatic, erix,  technojosh, kejohm, Khen1950fx, salva, tobyink (3 of 4 discussion threads!), Your Mother.
 
+=item * Version 0.002:
+
+Martin J. Evans was the first developer giving me feedback and nice bug reports on Version 0.001, thanks a lot!
+
+=back
+
 =head1 AUTHOR
 
-Jos\x{00E9} Diaz Seng, C<< <josediazseng at gmx.de> >>
+Jose Diaz Seng, C<< <josediazseng at gmx.de> >>
 
 =head1 BUGS
 
@@ -715,7 +721,7 @@ L<http://search.cpan.org/dist/DBIx-Table-TestDataGenerator/>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2012 Jos\x{00E9} Diaz Seng.
+Copyright 2012 Jose Diaz Seng.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published

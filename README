@@ -15,21 +15,21 @@ SYNOPSIS
         );
 
         #simple usage:
-        $generator->create({
+        $generator->create_testdata(
             target_size    => $target_size,
             num_random     => $num_random,
             seed           => $seed,
-        });
+        );
 
         #extended usage handling a self-reference of the target table:
-        $generator->create({
+        $generator->create_testdata(
                 target_size    => $target_size,
                 num_random     => $num_random,
                 seed           => $seed,
                 max_tree_depth => $max_tree_depth,
                 min_children   => $min_children,
                 min_roots      => $min_roots,
-        });
+        );
 
 
         #instantiation using a custom DBMS handling class
@@ -63,7 +63,8 @@ DESCRIPTION
     as possible. Currently Oracle, PostgreSQL and SQLite are supported,
     further DBMSs are in the work and one can add further databases or
     change the default behaviour by writing a class satisfying the role
-    defined in DBIx::Table::TestDataGenerator::TableProbe.pm.
+    defined in DBIx::Table::TestDataGenerator::TableProbe.pm. NOTE: A major
+    refactoring is on its way, see section FURTHER DEVELOPMENT.
 
     In the synopsis, an extended usage has been mentioned. This refers to
     the common case of having a self-reference on a table, i.e. a one-column
@@ -195,9 +196,9 @@ DATABASE VERSIONS TESTED AGAINST
     *   PostgreSQL 9.2.1
 
 ENVIRONMENTS TESTED IN
-    The module has been tested on a Windows 7 32-bit machine, both on
-    Windows using Strawberry Perl 5.16.1.1 and on a VirtualBox image of
-    Fedora-17-x86 running on the same Windows machine.
+    The module has been tested on a Windows 7 32-bit machine under
+    Strawberry Perl 5.16.1.1 and in an Ubuntu 12.04 VirtualBox image using
+    perlbrew with naked Perl versions 5.17.6 and 5.10.1.
 
 LIMITATIONS
     *   Currently, the module executes the inserts in one big transaction if
@@ -227,25 +228,11 @@ LIMITATIONS
         identified by having the parent id set to NULL.
 
 FURTHER DEVELOPMENT
-    *   Currently the module is using DBI and plain SQL. For the first
-        version I am fine with it since I am used to writing and reading SQL
-        and I wanted to focus on other things first, but I am aware that
-        this may not be the best solution. I will most certainly refactor
-        this, but only after having added a few more DBMSs (see the
-        following bullet point).
-
-    *   Further DBMSs are in the work, only widespread DBMSs having a DBD
-        driver on CPAN have been considered. DBMSs where the concept of a
-        constraint does not exist are not interesting since in this case it
-        is trivial to add records to a target table, so e.g. Excel or csv
-        files will not be supported. Additional databases planned to be
-        supported in the upcoming versions will be MySQL, MS SQL Server (via
-        DBD::ODBC), MS Access, DB2, FireBird and Informix.
-
-    *   One can add custom classes to change the behaviour of the module or
-        to support further DBMSs. But part of the creation of new records
-        cannot be easily modified (see the next bullet point). I will try to
-        improve this situation and make it easier to override behaviour.
+    *   A major refactoring planned to be released with version 0.003 is in
+        the works where I want to remove database specific handling with the
+        help of DBIx::Class. Even if some DBMS specifics are left, this will
+        help to support a broad range of DBMSs and the matureness of
+        DBIx::Class will certainly help to keep the number of bugs low.
 
     *   The current version handles uniqueness constraints by picking out a
         column involved in the constraint and incrementing it appropriately.
@@ -255,27 +242,35 @@ FURTHER DEVELOPMENT
         handling the single selected column.
 
     *   Support for transactions and specifying transaction sizes will be
-        added soon.
+        added.
 
     *   It will be possible to get the SQL source of all generated inserts
         without having them executed on the database.
 
 ACKNOWLEDGEMENTS
-    A big thank you to all perl coders on the dbi-dev, DBIx-Class and
-    perl-modules mailing lists and on PerlMonks who have patiently answered
-    my questions and offered solutions, advice and encouragement, the Perl
-    community is really outstanding.
+    *   Version 0.001:
 
-    Special thanks go to Tim Bunce (module name / advice on keeping the
-    module extensible), Jonathan Leffler (module naming discussion /
-    relation to existing modules / multiple suggestions for features), brian
-    d foy (module naming discussion / mailing lists / encouragement) and the
-    following Perl monks (see the threads for user jds17 for details):
-    chromatic, erix, technojosh, kejohm, Khen1950fx, salva, tobyink (3 of 4
-    discussion threads!), Your Mother.
+        A big thank you to all perl coders on the dbi-dev, DBIx-Class and
+        perl-modules mailing lists and on PerlMonks who have patiently
+        answered my questions and offered solutions, advice and
+        encouragement, the Perl community is really outstanding.
+
+        Special thanks go to Tim Bunce (module name / advice on keeping the
+        module extensible), Jonathan Leffler (module naming discussion /
+        relation to existing modules / multiple suggestions for features),
+        brian d foy (module naming discussion / mailing lists /
+        encouragement) and the following Perl monks (see the threads for
+        user jds17 for details): chromatic, erix, technojosh, kejohm,
+        Khen1950fx, salva, tobyink (3 of 4 discussion threads!), Your
+        Mother.
+
+    *   Version 0.002:
+
+        Martin J. Evans was the first developer giving me feedback and nice
+        bug reports on Version 0.001, thanks a lot!
 
 AUTHOR
-    Jos\x{00E9} Diaz Seng, "<josediazseng at gmx.de>"
+    Jose Diaz Seng, "<josediazseng at gmx.de>"
 
 BUGS
     Please report any bugs or feature requests to
@@ -310,7 +305,7 @@ SUPPORT
         <http://search.cpan.org/dist/DBIx-Table-TestDataGenerator/>
 
 LICENSE AND COPYRIGHT
-    Copyright 2012 Jos\x{00E9} Diaz Seng.
+    Copyright 2012 Jose Diaz Seng.
 
     This program is free software; you can redistribute it and/or modify it
     under the terms of either: the GNU General Public License as published

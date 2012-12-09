@@ -4,7 +4,7 @@
       "JosÃ© Diaz Seng <josediazseng@gmx.de>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.4002, CPAN::Meta::Converter version 2.120921",
+   "generated_by" : "Module::Build version 0.4003, CPAN::Meta::Converter version 2.112150",
    "license" : [
       "perl_5"
    ],
@@ -16,7 +16,7 @@
    "prereqs" : {
       "build" : {
          "requires" : {
-            "Test::More" : "0"
+            "Test::More" : 0
          }
       },
       "configure" : {
@@ -26,6 +26,18 @@
       },
       "runtime" : {
          "requires" : {
+            "Carp" : 0,
+            "Class::Load" : 0,
+            "DBD::SQLite" : 0,
+            "DBI" : 0,
+            "DBI::Const::GetInfoType" : 0,
+            "DBIx::Admin::TableInfo" : 0,
+            "List::MoreUtils" : 0,
+            "List::Util" : 0,
+            "Moo" : 0,
+            "Moo::Role" : 0,
+            "Readonly" : 0,
+            "Test::Exception" : 0,
             "perl" : "5.006"
          }
       }
@@ -33,7 +45,7 @@
    "provides" : {
       "DBIx::Table::TestDataGenerator" : {
          "file" : "lib/DBIx/Table/TestDataGenerator.pm",
-         "version" : "0.001"
+         "version" : "0.002"
       },
       "DBIx::Table::TestDataGenerator::DBDriverUtils" : {
          "file" : "lib/DBIx/Table/TestDataGenerator/DBDriverUtils.pm",
@@ -66,5 +78,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.001"
+   "version" : "0.002"
 }

@@ -1,4 +1,12 @@
 Revision history for DBIx-Table-TestDataGenerator
 
+0.002	 05th December 2012
+		 Bugfixes:	
+			(1) Database schema argument was declared optional, but in fact needed, resulting in an error (https://rt.cpan.org/Ticket/Display.html?id=81689)
+			
+			(2)	Missing install dependencies (https://rt.cpan.org/Ticket/Display.html?id=81687 and https://rt.cpan.org/Ticket/Display.html?id=81685)
+			
+			(3) Errors in POD usage section (https://rt.cpan.org/Ticket/Display.html?id=81686)		 
+
 0.001    28th October 2012
          First version, supports Oracle, PostgreSQL and SQLite.

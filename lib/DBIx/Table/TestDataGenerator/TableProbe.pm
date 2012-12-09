@@ -122,7 +122,7 @@ Returns a parameterized insert statement for the target table involving the pass
 
 Returns the number of records in the target table.
 
-=head2 print_table ( $colname_array_ref, $col_width_array_ref )
+=head2 print_table
 
 Arguments:
 
@@ -174,7 +174,7 @@ Seeds the random number with the integer $seed to allow for reproducible runs. I
 
 Determines a random record from table $table and returns a reference to a hash where the keys are the column names in list $colname_list and the values the values of these columns in the selected record.
 
-=head2 get_incrementor ($type, $max)
+=head2 get_incrementor
 
 Arguments:
 
@@ -264,11 +264,11 @@ Suppose we have a self-reference in the target table, i.e. a one-column foreign 
 
 =head1 AUTHOR
 
-Jos\x{00E9} Diaz Seng, C<< <josediazseng at gmx.de> >>
+Jose Diaz Seng, C<< <josediazseng at gmx.de> >>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2012 Jos\x{00E9} Diaz Seng.
+Copyright 2012 Jose Diaz Seng.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published
