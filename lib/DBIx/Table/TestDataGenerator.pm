@@ -4,7 +4,7 @@ use Moo;
 use strict;
 use warnings;
 
-our $VERSION = "0.002";
+our $VERSION = "0.003";
 $VERSION = eval $VERSION;
 
 use Carp;
@@ -231,7 +231,7 @@ sub create_testdata {
         $handle_self_ref,        $selfref_tree
     );
 
-    if ( keys $fkey_tables_ref > 0 ) {
+    if ( keys %{$fkey_tables_ref} > 0 ) {
         $all_refcol_to_col_dict =
             $probe->fkey_referenced_cols_to_referencing_cols();
 
@@ -630,10 +630,6 @@ When installing from CPAN, the install tests look for the environment variables 
 =item * PostgreSQL 9.2.1
 
 =back
-
-=head1 ENVIRONMENTS TESTED IN
-
-The module has been tested on a Windows 7 32-bit machine under Strawberry Perl 5.16.1.1 and in an Ubuntu 12.04 VirtualBox image using perlbrew with naked Perl versions 5.17.6 and 5.10.1.
 
 =head1 LIMITATIONS
 

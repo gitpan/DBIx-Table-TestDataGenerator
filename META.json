@@ -45,7 +45,7 @@
    "provides" : {
       "DBIx::Table::TestDataGenerator" : {
          "file" : "lib/DBIx/Table/TestDataGenerator.pm",
-         "version" : "0.002"
+         "version" : "0.003"
       },
       "DBIx::Table::TestDataGenerator::DBDriverUtils" : {
          "file" : "lib/DBIx/Table/TestDataGenerator/DBDriverUtils.pm",
@@ -78,5 +78,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.002"
+   "version" : "0.003"
 }

@@ -1,3 +1,4 @@
+.gitattributes
 Build.PL
 Changes
 ignore.txt
@@ -13,6 +14,7 @@ MANIFEST			This list of files
 META.json
 META.yml
 README
+SQLite.bat
 t/00-load.t
 t/01_Test_TestDataGenerator.t
 t/02_Test_TestDataGenerator.t

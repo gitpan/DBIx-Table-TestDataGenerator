@@ -195,11 +195,6 @@ DATABASE VERSIONS TESTED AGAINST
 
     *   PostgreSQL 9.2.1
 
-ENVIRONMENTS TESTED IN
-    The module has been tested on a Windows 7 32-bit machine under
-    Strawberry Perl 5.16.1.1 and in an Ubuntu 12.04 VirtualBox image using
-    perlbrew with naked Perl versions 5.17.6 and 5.10.1.
-
 LIMITATIONS
     *   Currently, the module executes the inserts in one big transaction if
         the database handle has not set AutoCommit to true, but this will

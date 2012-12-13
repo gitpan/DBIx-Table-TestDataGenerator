@@ -1,5 +1,10 @@
 Revision history for DBIx-Table-TestDataGenerator
 
+0.003    14th December 2012
+		 Bugfixes:
+			(1)	TestDataGenerator.pm line 234: condition used "keys $hash_ref" instead of "keys %hash"
+			(2) TreeUtils.pm line 41: replaced smart match operator ~~ by use of grep to make it work with Perl versions older than 5.10
+
 0.002	 05th December 2012
 		 Bugfixes:	
 			(1) Database schema argument was declared optional, but in fact needed, resulting in an error (https://rt.cpan.org/Ticket/Display.html?id=81689)

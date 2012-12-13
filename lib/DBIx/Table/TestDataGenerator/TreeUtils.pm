@@ -38,7 +38,7 @@ sub _prune_tree {
             #check if there is a node at level 1
             foreach ( keys %tree ) {
                 my $id = $_;
-                if ( @{ $tree{$id} } > 0 && $id ~~ @{ $tree{$id} } ) {
+                if ( @{ $tree{$id} } > 0 && grep { $id eq $_ } @{ $tree{$id} } ) {
                     push @{ $self->_stack }, $id;
                     last;
                 }
