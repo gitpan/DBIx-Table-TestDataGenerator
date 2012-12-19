@@ -65,9 +65,9 @@ sub _prune_tree {
                 #Note that, if current level = 1, we have the
                 #current node as one of its own child nodes
                 my $num_missing =
-                    $min_children
-                    - @{ $tree{ @{ $self->_stack }[-1] } }
-                    + ( @{ $self->_stack } == 1 ? 1 : 0 );
+                  $min_children -
+                  @{ $tree{ @{ $self->_stack }[-1] } } +
+                  ( @{ $self->_stack } == 1 ? 1 : 0 );
                 if ( $num_missing > 0 ) {
                     push @{ $tree{ @{ $self->_stack }[-1] } }, $pkey;
                     return [ \%tree, @{ $self->_stack }[-1] ];
@@ -92,15 +92,14 @@ sub _prune_tree {
             #remove it from tree
             if ( @{ $self->_stack } == 1 ) {
                 %tree =
-                    %{ $self->_prune_tree( \%tree, @{ $self->_stack }[0] ) };
+                  %{ $self->_prune_tree( \%tree, @{ $self->_stack }[0] ) };
                 @{ $self->_stack }   = ();
                 @{ $self->_handled } = ();
             }
             else {
                 push @{ $self->_handled }, pop @{ $self->_stack };
             }
-            return $self->add_child( \%tree, $pkey, $min_children,
-                $max_depth );
+            return $self->add_child( \%tree, $pkey, $min_children, $max_depth );
         }
 
         #current node is not as deep as $max_depth -1,
@@ -113,15 +112,14 @@ sub _prune_tree {
             $handled_children++;
 
             #ignore already handled nodes
-            next if $curr_child ~~ @{ $self->_handled };
+            next if grep { $curr_child eq $_ } @{ $self->_handled };
 
             #o.k., child not handled yet, make it the current
             #node and recurse
             push @{ $self->_stack }, $curr_child;
             my $parent_key;
             ( $tree_ref, $parent_key ) =
-                @{ $self->add_child( \%tree, $pkey, $min_children,
-                    $max_depth ) };
+              @{ $self->add_child( \%tree, $pkey, $min_children, $max_depth ) };
             if ( defined $parent_key ) {
                 return [ $tree_ref, $parent_key ];
             }
@@ -133,8 +131,7 @@ sub _prune_tree {
 
         #if current node was base node, remove it from tree
         if ( @{ $self->_stack } == 0 ) {
-            %tree =
-                %{ $self->_prune_tree( \%tree, @{ $self->_handled }[-1] ) };
+            %tree = %{ $self->_prune_tree( \%tree, @{ $self->_handled }[-1] ) };
             @{ $self->_stack }   = ();
             @{ $self->_handled } = ();
         }
@@ -206,11 +203,11 @@ Maximum depth at which nodes are added, must be at least 2 since all nodes other
 
 =head1 AUTHOR
 
-Jos\x{00E9} Diaz Seng, C<< <josediazseng at gmx.de> >>
+Jose Diaz Seng, C<< <josediazseng at gmx.de> >>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2012 Jos\x{00E9} Diaz Seng.
+Copyright 2012 Jose Diaz Seng.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published

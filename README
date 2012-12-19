@@ -3,42 +3,32 @@ NAME
     DBMS
 
 VERSION
-    Version 0.0.1
+    Version 0.0.4
 
 SYNOPSIS
-        use DBIx::Table::TestDataGenerator;
+            use DBIx::Table::TestDataGenerator;
+        
+            my $generator = DBIx::Table::TestDataGenerator->new(
+                    dsn                    => $data_source_name,
+                    user                   => $db_user_name,
+                    password               => $db_password,          
+                    table                  => $target_table_name,
+            );
 
-        my $generator = DBIx::Table::TestDataGenerator->new(
-                dbh                => $dbi_database_handle,
-                schema             => $schema_name,
-                table              => $target_table_name,
-        );
+            #simple usage:
+            $generator->create_testdata(
+                    target_size            => $target_size,
+                    num_random             => $num_random,            
+            );
 
-        #simple usage:
-        $generator->create_testdata(
-            target_size    => $target_size,
-            num_random     => $num_random,
-            seed           => $seed,
-        );
-
-        #extended usage handling a self-reference of the target table:
-        $generator->create_testdata(
-                target_size    => $target_size,
-                num_random     => $num_random,
-                seed           => $seed,
-                max_tree_depth => $max_tree_depth,
-                min_children   => $min_children,
-                min_roots      => $min_roots,
-        );
-
-
-        #instantiation using a custom DBMS handling class
-        my $generator = DBIx::Table::TestDataGenerator->new(
-                dbh                => $dbi_database_handle,
-                schema             => $schema_name,
-                table              => $target_table_name,
-                custom_probe_class => $custom_probe_class_name,
-        );
+            #extended usage handling a self-reference of the target table:
+            $generator->create_testdata(
+                            target_size        => $target_size,
+                            num_random         => $num_random,                
+                            max_tree_depth     => $max_tree_depth,
+                            min_children       => $min_children,
+                            min_roots          => $min_roots,
+            );
 
 DESCRIPTION
     There is often the need to create test data in database tables, e.g. to
@@ -51,20 +41,14 @@ DESCRIPTION
     tables referenced by foreign key constraints. The choice of the copied
     values is random for a number of runs the user can choose, afterwards
     the values are chosen randomly from a cache, reducing database traffic
-    for performance reasons. The user can define seeds for the randomization
-    to be able to reproduce a test run. One nice thing about this way to
-    construct new records is that at least at first sight, the added data
-    looks like real data, at least as real as the data initially present in
-    the table was.
+    for performance reasons. One nice thing about this way to construct new
+    records is that the additional data is similar to the data initially
+    present in the table.
 
     A main goal of the module is to reduce configuration to the absolute
     minimum by automatically determining information about the target table,
     in particular its constraints. Another goal is to support as many DBMSs
-    as possible. Currently Oracle, PostgreSQL and SQLite are supported,
-    further DBMSs are in the work and one can add further databases or
-    change the default behaviour by writing a class satisfying the role
-    defined in DBIx::Table::TestDataGenerator::TableProbe.pm. NOTE: A major
-    refactoring is on its way, see section FURTHER DEVELOPMENT.
+    as possible, this has been achieved by basing it on DBIx::Class modules.
 
     In the synopsis, an extended usage has been mentioned. This refers to
     the common case of having a self-reference on a table, i.e. a one-column
@@ -83,39 +67,29 @@ SUBROUTINES/METHODS
   new
     Arguments:
 
-    *   dbh: required DBI database handle
+    *   dsn: required DBI data source name
 
-    *   schema: optional database schema name
+    *   user: required database user
+
+    *   password: required database user's password
 
     *   table: required name of the target table
 
-    *   custom_probe_class: optional custom probe class name
-
     Return value:
 
-    a new TestDataGenerator object
+    A new TestDataGenerator object
 
-    Creates a new TestDataGenerator object. If the DBMS in question does not
-    support the concept of a schema, the corresponding argument may be
-    omitted. If a DBMS currently not supported by
-    DBI::Table::TestDataGenerator is to be supported, or the behaviour of
-    the current TableProbe class responsible for handling the DBMS must be
-    changed, one may provide the optional custom_probe_class parameter.
-    custom_probe_class being the name of a custom class impersonating the
-    TableProbe role.
+  dsn
+    Accessor for the DBI data source name.
 
-  dbh
-    Accessor for the DBI database handle.
+  user
+    Accessor for the database user.
 
-  schema
-    Accessor for the database schema name.
+  password
+    Accessor for the database user's password.
 
   table
     Accessor for the name of the target table.
-
-  custom_probe_class
-    Accessor for the name of a custom class impersonating the TableProbe
-    role.
 
   create_testdata
     This is the main method, it creates and adds new records to the target
@@ -137,15 +111,6 @@ SUBROUTINES/METHODS
         that even for the remaining records there is some randomness since
         the combination of cached values coming from columns involved in
         different constraints is random.
-
-    *   seed
-
-        This value must be an integer. In case it has been provided, the
-        random selections done by the Perl code as well as those done by the
-        database (where supported, e.g. not for SQLite) are seeded by this
-        value resp. a value based on this value, e.g. PostgreSQL accepting
-        only floating numbers between 0 and 1. This allows for reproducible
-        test runs.
 
     *   max_tree_depth
 
@@ -179,22 +144,6 @@ INSTALLATION AND CONFIGURATION
             ./Build test
             ./Build install
 
-    When installing from CPAN, the install tests look for the environment
-    variables TDG_DSN (connection string), TDG_USER (user), TDG_PWD
-    (password) and TDG_SCHEMA (schema) which may be used to test the
-    installation against an existing database. If TDG_DSN is found, the
-    install will try to use this connection string and the tests will fail
-    if no valid database connection can be established. If TDG_DSN is not
-    found, the installation creates an in-memory SQLite database provided
-    for free by the DBD::SQLite module and tests against this database.
-
-DATABASE VERSIONS TESTED AGAINST
-    *   SQLite 3.7.14.1
-
-    *   Oracle 11g XE
-
-    *   PostgreSQL 9.2.1
-
 LIMITATIONS
     *   Currently, the module executes the inserts in one big transaction if
         the database handle has not set AutoCommit to true, but this will
@@ -204,15 +153,14 @@ LIMITATIONS
         Constraints such as check constraints, which are very diverse and
         database specific, are not handled (and most probably will not be).
 
-    *   Uniqueness constraints involving only columns which the DBMS
-        specific TableProbe role handler does not know how to increment
-        cannot be handled. Typically, all string and numeric data types are
-        supported and the set of supported data types is defined by the list
-        provided by the TableProbe role method
-        get_type_preference_for_incrementing(). I am thinking about allowing
-        date incrementation, too, it would be necessary then to at least add
-        a configuration parameter defining what time incrementation step to
-        use.
+    *   Uniqueness constraints involving only columns which the TableProbe
+        class does not know how to increment cannot be handled. Typically,
+        all string and numeric data types are supported and the set of
+        supported data types is defined by the list provided by the
+        TableProbe method get_type_preference_for_incrementing(). I am
+        thinking about allowing date incrementation, too, it would be
+        necessary then to at least add a configuration parameter defining
+        what time incrementation step to use.
 
     *   When calling create_testdata, max_tree_depth = 1 should be allowed,
         too, meaning that all new records will be root records.
@@ -223,24 +171,20 @@ LIMITATIONS
         identified by having the parent id set to NULL.
 
 FURTHER DEVELOPMENT
-    *   A major refactoring planned to be released with version 0.003 is in
-        the works where I want to remove database specific handling with the
-        help of DBIx::Class. Even if some DBMS specifics are left, this will
-        help to support a broad range of DBMSs and the matureness of
-        DBIx::Class will certainly help to keep the number of bugs low.
-
     *   The current version handles uniqueness constraints by picking out a
         column involved in the constraint and incrementing it appropriately.
-        While one may do something different in a custom TableProbe class
-        than incrementing and even if the values are being incremented, the
-        calculation of the increment may be different, one is constrained to
-        handling the single selected column.
+        This should be made customizable in future versions.
 
     *   Support for transactions and specifying transaction sizes will be
         added.
 
     *   It will be possible to get the SQL source of all generated inserts
         without having them executed on the database.
+
+    *   Currently one cannot specify a seed for the random selections used
+        to define the generated records since the used class
+        DBIx::Class::Helper::ResultSet::Random does not provide this. For
+        reproducible tests this would be a nice feature.
 
 ACKNOWLEDGEMENTS
     *   Version 0.001:

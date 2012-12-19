@@ -1,13 +1,14 @@
 ---
 abstract: 'Automatic test data creation, cross DBMS'
 author:
-  - 'JosÃ© Diaz Seng <josediazseng@gmx.de>'
+  - 'Jose Diaz Seng <josediazseng@gmx.de>'
 build_requires:
   Test::More: 0
 configure_requires:
+  DBIx::Class: 0.08203
   Module::Build: 0.4
 dynamic_config: 1
-generated_by: 'Module::Build version 0.4003, CPAN::Meta::Converter version 2.112150'
+generated_by: 'Module::Build version 0.4003, CPAN::Meta::Converter version 2.120630'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -16,39 +17,39 @@ name: DBIx-Table-TestDataGenerator
 provides:
   DBIx::Table::TestDataGenerator:
     file: lib/DBIx/Table/TestDataGenerator.pm
-    version: 0.003
+    version: 0.004
   DBIx::Table::TestDataGenerator::DBDriverUtils:
     file: lib/DBIx/Table/TestDataGenerator/DBDriverUtils.pm
     version: 0
+  DBIx::Table::TestDataGenerator::ResultSetWithRandom:
+    file: lib/DBIx/Table/TestDataGenerator/ResultSetWithRandom.pm
+    version: 0
   DBIx::Table::TestDataGenerator::TableProbe:
     file: lib/DBIx/Table/TestDataGenerator/TableProbe.pm
-    version: 0
-  DBIx::Table::TestDataGenerator::TableProbe::Oracle:
-    file: lib/DBIx/Table/TestDataGenerator/TableProbe/Oracle.pm
-    version: 0
-  DBIx::Table::TestDataGenerator::TableProbe::Postgres:
-    file: lib/DBIx/Table/TestDataGenerator/TableProbe/Postgres.pm
-    version: 0
-  DBIx::Table::TestDataGenerator::TableProbe::SQLite:
-    file: lib/DBIx/Table/TestDataGenerator/TableProbe/SQLite.pm
     version: 0
   DBIx::Table::TestDataGenerator::TreeUtils:
     file: lib/DBIx/Table/TestDataGenerator/TreeUtils.pm
     version: 0
 requires:
   Carp: 0
-  Class::Load: 0
+  Cwd: 0
   DBD::SQLite: 0
   DBI: 0
   DBI::Const::GetInfoType: 0
-  DBIx::Admin::TableInfo: 0
-  List::MoreUtils: 0
+  DBIx::Class::Helper::ResultSet::Random: 0
+  DBIx::Class::Optional::Dependencies: 0
+  DBIx::Class::Relationship: 0
+  DBIx::Class::Schema::Loader: 0
+  DBIx::RunSQL: 0
+  File::Basename: 0
+  File::Path: 0
+  File::Spec: 0
   List::Util: 0
   Moo: 0
-  Moo::Role: 0
   Readonly: 0
+  SQL::Translator: 0.11006
   Test::Exception: 0
   perl: 5.006
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.003
+version: 0.004

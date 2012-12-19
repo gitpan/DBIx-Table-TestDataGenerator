@@ -9,19 +9,25 @@ WriteMakefile
   'EXE_FILES' => [],
   'VERSION_FROM' => 'lib/DBIx/Table/TestDataGenerator.pm',
   'PREREQ_PM' => {
-                   'Test::Exception' => 0,
                    'DBD::SQLite' => 0,
+                   'File::Spec' => 0,
+                   'List::Util' => 0,
+                   'DBIx::RunSQL' => 0,
+                   'DBIx::Class::Relationship' => 0,
+                   'File::Path' => 0,
+                   'DBIx::Class::Schema::Loader' => 0,
+                   'DBI' => 0,
+                   'Test::Exception' => 0,
+                   'SQL::Translator' => '0.11006',
+                   'DBIx::Class::Optional::Dependencies' => 0,
                    'Moo' => 0,
-                   'Class::Load' => 0,
-                   'Moo::Role' => 0,
-                   'DBIx::Admin::TableInfo' => 0,
                    'Readonly' => 0,
                    'Carp' => 0,
                    'Test::More' => 0,
-                   'List::Util' => 0,
-                   'List::MoreUtils' => 0,
+                   'DBIx::Class::Helper::ResultSet::Random' => 0,
+                   'File::Basename' => 0,
                    'DBI::Const::GetInfoType' => 0,
-                   'DBI' => 0
+                   'Cwd' => 0
                  }
 )
 ;

@@ -1,53 +1,134 @@
 package DBIx::Table::TestDataGenerator::TableProbe;
-use Moo::Role;
+use Moo;
 
 use strict;
 use warnings;
 
 use Carp;
 
+use File::Spec;
+use File::Basename;
+use File::Path qw /rmtree/;
+use Cwd qw /abs_path/;
+
 use Readonly;
 Readonly my $COMMA         => q{,};
 Readonly my $PIPE          => q{|};
 Readonly my $QUESTION_MARK => q{?};
 
-#Methods that need to be implemented by classes impersonating the
-#TableProbe role:
-requires qw(seed column_names random_record
-    num_roots get_type_preference_for_incrementing get_incrementor
-    unique_columns_with_max fkey_name_to_fkey_table
-    fkey_referenced_cols_to_referencing_cols
-    fkey_referenced_cols get_self_reference selfref_tree);
+use DBI;
+use DBIx::RunSQL;
+use DBIx::Class::Relationship;
+use DBIx::Table::TestDataGenerator::ResultSetWithRandom;
+use DBIx::Class::Schema::Loader qw/ make_schema_at /;
 
-has dbh => ( is => 'ro', );
+#extra dependencies needed
+use DBIx::Class::Optional::Dependencies;
 
-has database => ( is => 'ro', );
+has dsn => ( is => 'ro', );
 
-has schema => ( is => 'ro', );
+has user => ( is => 'ro', );
+
+has password => ( is => 'ro', );
+
+has on_the_fly_schema_sql => ( is => 'ro', );
 
 has table => ( is => 'ro', );
 
-sub insert_statement {
+has _dbh => ( is => 'rw', );
+
+my ( $dbic_schema, $sth_insert );
+
+my %result_classes;
+
+sub _get_handle_to_db_created_from_script {
+    my ( $self ) = @_;
+    return DBIx::RunSQL->create(
+        dsn     => $self->dsn,
+        sql     => $self->on_the_fly_schema_sql,
+        force   => 1,        
+    );
+}
+
+sub dump_schema {
+    my ( $self ) = @_;
+
+    #make_schema_at disconnects the passed database handle, therefore we pass
+    #a clone to it resp. the handle $dbh_for_schema_dump if defined
+    my $dbh_for_dump;
+    if ( defined $self->on_the_fly_schema_sql ) {
+        $self->_dbh(
+            $self->_get_handle_to_db_created_from_script(
+                $self->on_the_fly_schema_sql
+            )
+        );
+        $dbh_for_dump =
+          $self->_get_handle_to_db_created_from_script(
+            $self->on_the_fly_schema_sql );
+    }
+    else {
+        $self->_dbh( DBI->connect( $self->dsn, $self->user, $self->password ) );
+        
+        $dbh_for_dump =
+          DBI->connect( $self->dsn, $self->user, $self->password );
+    }
+
+    my $attrs = {
+        debug          => 1,
+        dump_directory => '.',
+		quiet          => 1,
+    };
+    make_schema_at( 'DBIx::Table::TestDataGenerator::DBIC::Schema',
+        $attrs, [ sub { $dbh_for_dump }, {} ] );
+
+    #in the current version, make_schema_at removes '.' from @INC, therefore:
+    push @INC, '.';
+    eval {
+        require DBIx::Table::TestDataGenerator::DBIC::Schema;
+        DBIx::Table::TestDataGenerator::DBIC::Schema->import();
+        1;
+    } or do {
+        my $error = $@;
+        croak $error;
+    };
+
+    $dbic_schema =
+      DBIx::Table::TestDataGenerator::DBIC::Schema->connect( sub { $self->_dbh }
+      );
+}
+
+sub _insert_statement {
     my ( $self, $colname_array_ref ) = @_;
     my $all_cols = join $COMMA, @{$colname_array_ref};
     my $placeholders = join $COMMA,
-        ($QUESTION_MARK) x ( 0 + @{$colname_array_ref} );
+      ($QUESTION_MARK) x ( 0 + @{$colname_array_ref} );
     return
-          'INSERT INTO '
-        . $self->table
-        . " ($all_cols) VALUES ($placeholders)";
+        'INSERT INTO '
+      . $self->table
+      . " ($all_cols) VALUES ($placeholders)";
+}
+
+sub prepare_insert {
+    my ( $self, $all_cols ) = @_;
+    $sth_insert = $self->_dbh->prepare( $self->_insert_statement($all_cols) );
+}
+
+sub execute_insert {
+    my ( $self, $all_vals ) = @_;
+    $sth_insert->execute( @{$all_vals} );
+}
+
+sub commit {
+    my ($self) = @_;
+    $self->_dbh->commit()
+      unless $self->_dbh->{AutoCommit}
+      or croak "Could not commit the inserts:\n" . $self->_dbh->errstr;
 }
 
 sub num_records {
     my ($self) = @_;
-    my $table  = $self->table;
-    my $sql    = <<"END_SQL";
-SELECT COUNT (*) AS num_records_orig
-FROM $table
-END_SQL
-    my $sth = $self->dbh->prepare($sql);
-    $sth->execute();
-    return ( $sth->fetchrow_array() )[0];
+    my $cls = $self->_get_result_class( $self->table );
+    return $dbic_schema->resultset($cls)->count;
 }
 
 sub print_table {
@@ -56,9 +137,7 @@ sub print_table {
 
     #determine format string
     my $format =
-          $PIPE
-        . join( $PIPE, map {"\%${_}s"} @{$col_width_array_ref} )
-        . $PIPE;
+      $PIPE . join( $PIPE, map { "\%${_}s" } @{$col_width_array_ref} ) . $PIPE;
 
     #print header
     printf $format, @{$colname_array_ref};
@@ -70,7 +149,7 @@ sub print_table {
 SELECT $col_list
 FROM $table
 END_SQL
-    my $sth = $self->dbh->prepare($sql);
+    my $sth = $self->_dbh->prepare($sql);
     $sth->execute();
 
     while ( my @row = $sth->fetchrow_array ) {
@@ -78,6 +157,348 @@ END_SQL
         print "\n";
     }
     return;
+}
+
+sub _get_result_class {
+    my ( $self, $tab ) = @_;
+
+    $tab = uc $tab;
+
+    return $result_classes{$tab} if $result_classes{$tab};
+
+    foreach my $src_name ( $dbic_schema->sources ) {
+        my $result_source = $dbic_schema->source($src_name);
+        my %src_descr     = %{ $dbic_schema->source($src_name) };
+        my $descr         = $src_descr{name};
+        $descr = ref($descr) ? ${$descr} : $descr;
+        $descr =~ s/^\W//;
+        $descr =~ s/\W$//;
+        next unless uc $descr eq $tab;
+        $result_classes{$tab} = $result_source->result_class;
+        return $result_classes{$tab};
+    }
+    croak 'could not find result class for ' . $tab
+      unless $result_classes{$tab};
+}
+
+sub _self_ref_condition {
+    my ($self) = @_;
+    my %col_relations;
+    my $result_class = $self->_get_result_class( $self->table );
+    foreach my $sname ( $dbic_schema->sources ) {
+        my $s = $dbic_schema->source($sname);
+        foreach my $rname ( $s->relationships ) {
+            my $rel = $s->relationship_info($rname);
+            if (   $rel->{class} eq $result_class
+                && defined $rel->{attrs}->{is_foreign_key_constraint}
+                && $rel->{attrs}->{is_foreign_key_constraint} eq '1' )
+            {
+                my %cols = %{ $rel->{cond} };
+                foreach my $referencing_col ( keys %cols ) {
+                    my $referenced_col = $cols{$referencing_col};
+
+                    $referencing_col =~ s/(?:.*\.)?(.+)/$1/;
+                    $referenced_col  =~ s/(?:.*\.)?(.+)/$1/;
+
+                    $col_relations{$referencing_col} =
+                      { '=' => \$referenced_col };
+                }
+                return [ $rname, \%col_relations ];
+            }
+        }
+    }
+    return;
+}
+
+#TODO: remove next comment
+#here the old role methods start
+sub column_names {
+    my ($self) = @_;
+    my $cls = $self->_get_result_class( $self->table );
+
+    my @column_names = $cls->columns;
+    return \@column_names;
+}
+
+sub random_record {
+    my ( $self, $tab, $colname_list, $class_name_passed ) = @_;
+    my $result_set;
+    if ($class_name_passed) {
+        $result_set = $dbic_schema->resultset($tab);
+    }
+    else {
+        my $src = $self->_get_result_class($tab);
+        $result_set = $dbic_schema->resultset( $src->result_class );
+    }
+
+    bless $result_set, 'DBIx::Table::TestDataGenerator::ResultSetWithRandom';
+    my %result;
+
+#temporarily commented out until DBIx::Class::Helper::ResultSet::Random has been patched
+#my $row = $result_set->rand->single;
+    my $row = $self->_rand($result_set)->single;
+
+    #TODO: extract data, put into %result
+    foreach ( @{$colname_list} ) {
+        $result{$_} = ${ $row->{_column_data} }{$_};
+    }
+    return \%result;
+}
+
+#####START substitute code until DBIx::Class::Helper::ResultSet::Random has been patched####
+
+{
+
+    my %rand_order_by = (
+        'DBIx::Class::Storage::DBI::Sybase::MSSQL' => 'NEWID()',
+        'DBIx::Class::Storage::DBI::Sybase::Microsoft_SQL_Server::NoBindVars'
+          => 'NEWID()',
+        'DBIx::Class::Storage::DBI::Sybase::Microsoft_SQL_Server' => 'NEWID()',
+        'DBIx::Class::Storage::DBI::Sybase::ASE::NoBindVars'      => 'RAND()',
+        'DBIx::Class::Storage::DBI::Sybase::ASE'                  => 'RAND()',
+        'DBIx::Class::Storage::DBI::Sybase'                       => 'RAND()',
+        'DBIx::Class::Storage::DBI::SQLite'                       => 'RANDOM()',
+        'DBIx::Class::Storage::DBI::SQLAnywhere'                  => 'RAND()',
+        'DBIx::Class::Storage::DBI::Pg'                           => 'RANDOM()',
+        'DBIx::Class::Storage::DBI::Oracle::WhereJoins' => 'dbms_random.value',
+        'DBIx::Class::Storage::DBI::Oracle::Generic'    => 'dbms_random.value',
+        'DBIx::Class::Storage::DBI::Oracle'             => 'dbms_random.value',
+        'DBIx::Class::Storage::DBI::ODBC::SQL_Anywhere' => 'RAND()',
+        'DBIx::Class::Storage::DBI::ODBC::Microsoft_SQL_Server' => 'NEWID()',
+        'DBIx::Class::Storage::DBI::ODBC::Firebird'             => 'RAND()',
+        'DBIx::Class::Storage::DBI::ODBC::ACCESS'               => 'RND()',
+        'DBIx::Class::Storage::DBI::mysql::backup'              => 'RAND()',
+        'DBIx::Class::Storage::DBI::mysql'                      => 'RAND()',
+        'DBIx::Class::Storage::DBI::MSSQL'                      => 'NEWID()',
+        'DBIx::Class::Storage::DBI::InterBase'                  => 'RAND()',
+        'DBIx::Class::Storage::DBI::Firebird::Common'           => 'RAND()',
+        'DBIx::Class::Storage::DBI::Firebird'                   => 'RAND()',
+        'DBIx::Class::Storage::DBI::DB2'                        => 'RAND()',
+        'DBIx::Class::Storage::DBI::ADO::MS_Jet'                => 'RND()',
+        'DBIx::Class::Storage::DBI::ADO::Microsoft_SQL_Server'  => 'NEWID()',
+        'DBIx::Class::Storage::DBI::ACCESS'                     => 'RND()',
+    );
+
+    #sort keys descending to handle more specific storage classes first
+    my @keys_rand_order_by = sort { $b cmp $a } keys %rand_order_by;
+
+    sub _rand_order_by {
+        my ( $self, $result_set ) = @_;
+        $result_set->result_source->storage->_determine_driver;
+        my $storage = $result_set->result_source->storage;
+
+        foreach my $dbms (@keys_rand_order_by) {
+            return $rand_order_by{$dbms} if $storage->isa($dbms);
+        }
+
+        return 'RAND()';
+    }
+}
+
+sub _rand {
+    my ( $self, $result_set ) = @_;
+    my $order_by = $self->_rand_order_by($result_set);
+
+    return $result_set->search( undef, { rows => 1, order_by => \$order_by } );
+}
+
+#####END substitute code until DBIx::Class::Helper::ResultSet::Random has been patched####
+
+sub num_roots {
+    my ($self) = @_;
+    my $cls = $self->_get_result_class( $self->table );
+
+    #find name of foreign key on target table being a self reference
+    my $self_ref_cond = $self->_self_ref_condition();
+    my $col_relations = @$self_ref_cond[1];
+
+    return $dbic_schema->resultset($cls)->search($col_relations)->count;
+}
+
+sub _remove_package_prefix {
+    my ( $self, $pck_name ) = @_;
+    $pck_name =~ s/(?:.*::)?([^:]+)/$1/;
+    return $pck_name;
+}
+
+#todo: improve function, e.g. for SQLite there is no datetime data type,
+#instead, "text" is used as the data type, this leads to nonsense values
+sub unique_columns_with_max {
+    my ( $self, $handle_pkey ) = @_;
+    my $tab          = $self->table;
+    my $result_class = $self->_get_result_class( $self->table );
+    my $src          = $dbic_schema->source($result_class);
+    my %constraints  = $src->unique_constraints();
+
+    my %unique_with_max;
+    foreach my $constraint_name ( keys %constraints ) {
+        next
+          unless ( $handle_pkey && $constraint_name eq 'primary'
+            || !$handle_pkey && $constraint_name ne 'primary' );
+
+        my %constr_info;
+        my @cols = @{ $constraints{$constraint_name} };
+        foreach my $col_name (@cols) {
+
+            #note: column types are converted to upper case to simplify
+            #comparisons later on
+            my $col_type = uc ${ $src->column_info($col_name) }{data_type};
+            my $is_text  = $self->_is_text($col_type);
+            my $col_max;
+            if ($is_text) {
+                $col_max = $self->_max_length( $col_name, $result_class );
+            }
+            else {
+                $col_max = $self->_max_value( $col_name, $result_class );
+            }
+
+            $constr_info{$col_type} ||= [];
+            push @{ $constr_info{$col_type} }, [ $col_name, $col_max ];
+        }
+        $unique_with_max{$constraint_name} = \%constr_info;
+    }
+    return \%unique_with_max;
+}
+
+sub get_incrementor {
+    my ( $self, $type, $max ) = @_;
+    if ( $self->_is_text($type) ) {
+        my $i      = 0;
+        my $suffix = 'A' x $max;
+        return sub {
+            return $suffix . $i++;
+          }
+    }
+
+    return sub { return ++$max };
+}
+
+sub get_type_preference_for_incrementing {
+    my @types =
+      qw(DECIMAL DOUBLE FLOAT NUMBER NUMERIC REAL BIGINT INTEGER SMALLINT
+      TINYINT NVARCHAR2 NVARCHAR LVARCHAR VARCHAR2 VARCHAR LONGCHAR NTEXT
+      TEXT);
+    return \@types;
+}
+
+sub _is_text {
+    my ( $self, $col_type ) = @_;
+    return $col_type !~ /\b(?:integer|number|numeric|decimal|long)\b/i;
+}
+
+sub _max_value {
+    my ( $self, $col_name, $result_class ) = @_;
+    return $dbic_schema->resultset($result_class)->search()
+      ->get_column($col_name)->max();
+}
+
+sub _max_length {
+    my ( $self, $col_name, $result_class ) = @_;
+    my @vals =
+      $dbic_schema->resultset($result_class)->search()->get_column($col_name)
+      ->func('LENGTH');
+    return ( sort { $b <=> $a } @vals )[0];
+}
+
+sub fkey_name_to_source {
+    my ($self) = @_;
+    my %fkey_to_src;
+    my $pck_name    = $self->_get_result_class( $self->table );
+    my $source_name = $self->_remove_package_prefix($pck_name);
+    my $s           = $dbic_schema->source($source_name);
+    foreach my $rname ( $s->relationships ) {
+        my $rel = $s->relationship_info($rname);
+        if ( defined $rel->{attrs}->{is_foreign_key_constraint}
+            && $rel->{attrs}->{is_foreign_key_constraint} eq '1' )
+        {
+            my $src = $self->_remove_package_prefix( $rel->{source} );
+            $fkey_to_src{$rname} = $src;
+        }
+    }
+
+    return \%fkey_to_src;
+}
+
+sub fkey_referenced_cols_to_referencing_cols {
+    my ($self) = @_;
+    my $table = $self->table;
+    my %all_refcol_to_col_dict;
+
+    my $src_descr = $self->_get_result_class( $self->table );
+
+    my @fkey_names = keys %{ $self->fkey_name_to_source() };
+
+    foreach (@fkey_names) {
+        my $fkey     = $_;
+        my $rel_info = $src_descr->relationship_info($fkey);
+
+        my %refcol_to_col_dict;
+
+        my %col_relation = %{ $rel_info->{cond} };
+        foreach my $cond ( keys %col_relation ) {
+            my $own_col = $col_relation{$cond};
+            $own_col =~ s /^self\.//;
+            my $ref_col = $cond;
+            $ref_col =~ s /^foreign\.//;
+
+            $refcol_to_col_dict{$ref_col} = $own_col;
+        }
+
+        $all_refcol_to_col_dict{$fkey} = \%refcol_to_col_dict;
+    }
+
+    return \%all_refcol_to_col_dict;
+}
+
+sub fkey_referenced_cols {
+    my ($self) = @_;
+    my %all_refcol_lists;
+
+    my $src_descr = $self->_get_result_class( $self->table );
+
+    my @fkey_names = keys %{ $self->fkey_name_to_source() };
+
+    foreach (@fkey_names) {
+        my $fkey     = $_;
+        my $rel_info = $src_descr->relationship_info($fkey);
+
+        my @ref_col_list;
+
+        my %col_relation = %{ $rel_info->{cond} };
+        foreach my $cond ( keys %col_relation ) {
+            my $ref_col = $cond;
+            $ref_col =~ s /^foreign\.//;
+            push @ref_col_list, $ref_col;
+        }
+        $all_refcol_lists{$fkey} = \@ref_col_list;
+    }
+
+    return \%all_refcol_lists;
+}
+
+sub get_self_reference {
+    my ( $self, $pkey_col_name ) = @_;
+
+    my $self_ref_cond = $self->_self_ref_condition();
+    my ( $fkey_name, $col_relations ) = @$self_ref_cond;
+    my %rel              = %{$col_relations};
+    my @referencing_cols = keys %rel;
+    my %h                = %{ ( values %rel )[0] };
+    return [ $fkey_name, ${ ( values %h )[0] } ];
+}
+
+sub selfref_tree {
+    my ( $self, $pkey_col, $ref_col ) = @_;
+    my $cls = $self->_get_result_class( $self->table );
+    my $rs  = $dbic_schema->resultset($cls)->search();
+    my %tree;
+
+    while ( my $rec = $rs->next() ) {
+        my $parent = $rec->get_column($ref_col);
+        $tree{$parent} ||= [];
+        push @{ $tree{$parent} }, $rec->get_column($pkey_col);
+    }
+    return \%tree;
 }
 
 1;    # End of DBIx::Table::TestDataGenerator::TableProbe
@@ -96,27 +517,39 @@ This class is used internally. For each DBMS to be supported by DBIx::Table::Tes
 
 =head1 SUBROUTINES/METHODS IMPLEMENTED BY TABLEPROBE ITSELF
 
-=head2 dbh
+=head2 dsn
 
-Read-only accessor for a DBI database handle.
-
-=head2 database
-
-Read-only accessor for a database name.
-
-=head2 schema
-
-Read-only accessor for a database schema name.
+DBI data source name.
 
 =head2 table
 
 Read-only accessor for the name of the table in which the test data will be created.
 
-=head2 insert_statement
+=head2 dump_schema
+
+Dumps the DBIx::Class schema for the current database to disk.
+
+=head2 _insert_statement
 
 Argument: A reference to an array containing the column names of the target table.
 
 Returns a parameterized insert statement for the target table involving the passed in column names.
+
+=head2 prepare_insert
+
+Argument: A reference to an array containing the column names of the target table.
+
+Prepares the insert statement.
+
+=head2 execute_insert
+
+Argument: A reference to an array containing the values for all columns of the target table in the order they have been passed to prepare_insert.
+
+Executes the insert statement.
+
+=head2 commit
+
+Commits the insert if necessary.
 
 =head2 num_records
 
@@ -140,7 +573,7 @@ Minimalistic printing of a table's contents to STDOUT for debugging purposes. Pr
 
 =head2 column_names
 
-Returns a reference to an array of the column names of the target table in no particular order.
+Returns a reference to an array of the lower cased column names of the target table in no particular order.
 
 =head2 num_roots
 
@@ -155,12 +588,6 @@ Arguments:
 =back
 
 Returns the number of roots in the target table in case a foreign key reference exists linking the referencing column $parent_pkey_col to the primary key column $pkey_col. A record is considered a node if either $pkey_col = $parent_pkey_col or $parent_pkey_col = NULL.
-
-=head2 seed
-
-Argument: random number seed $seed.
-
-Seeds the random number with the integer $seed to allow for reproducible runs. In cases such as SQLite, the random number generation cannot be seeded, so the method will do nothing in these cases.
 
 =head2 random_record
 
@@ -188,7 +615,7 @@ Arguments:
 
 Returns an anonymous function for incrementing the values of a column of data type $type starting at a value to be determined by the current "maximum" $max. In case of a numeric data type, $max will be just the current maximum, but in case of strings, we have decided to pass the maximum length since there is no natural ordering available. E.g. Perl using per default another order than the lexicographic order employed by Oracle. In our default implementations, for string data types we add values for the current column at 'A...A0', where A is repeated $max times and increase the appended integer in each step. This should be made more flexible in future versions.
 
-=head2 get_type_preference_for_incrementing 
+=head2 get_type_preference_for_incrementing
 
 Arguments: none
 
@@ -224,7 +651,7 @@ In case $get_pkey_columns is true, the corresponding information is returned for
       }
   }
 
-=head2 fkey_name_to_fkey_table
+=head2 fkey_name_to_source
 
 Arguments: none
 
@@ -250,13 +677,13 @@ If there is an fkey defining a self-reference, its name and the name of the refe
 
 =head2 selfref_tree
 
-Arguments: 
+Arguments:
 
 =over 4
 
 =item * $key_col: primary key column name of a one-column primary key
 
-=item * $parent_refkey_col: name of another column
+=item * $parent_refkey_col: name of another column referencing the primary key
 
 =back
 
@@ -275,4 +702,3 @@ under the terms of either: the GNU General Public License as published
 by the Free Software Foundation; or the Artistic License.
 
 See http://dev.perl.org/licenses/ for more information.
-

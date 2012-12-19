@@ -1,10 +1,5 @@
-#!perl
-
-use 5.006;
 use strict;
 use warnings;
-
-use version; our $VERSION = qv('0.0.1_1');
 
 use Test::More;
 

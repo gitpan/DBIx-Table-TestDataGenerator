@@ -1,17 +1,29 @@
 Revision history for DBIx-Table-TestDataGenerator
 
-0.003    14th December 2012
-		 Bugfixes:
-			(1)	TestDataGenerator.pm line 234: condition used "keys $hash_ref" instead of "keys %hash"
-			(2) TreeUtils.pm line 41: replaced smart match operator ~~ by use of grep to make it work with Perl versions older than 5.10
+0.004    xxth December 2012
 
-0.002	 05th December 2012
-		 Bugfixes:	
-			(1) Database schema argument was declared optional, but in fact needed, resulting in an error (https://rt.cpan.org/Ticket/Display.html?id=81689)
-			
-			(2)	Missing install dependencies (https://rt.cpan.org/Ticket/Display.html?id=81687 and https://rt.cpan.org/Ticket/Display.html?id=81685)
-			
-			(3) Errors in POD usage section (https://rt.cpan.org/Ticket/Display.html?id=81686)		 
+    A big refactoring has been done, the module is now based on DBIx::Class for all database related things, in particular it does not contain DBMS specific code apart from DBD::SQLite, which is used to define in-memory databases to allow running tests during the installation of the module.
+    
+    Currently, there is no seed functionality since for random selection of records we now use DBIx::Class::Helper::ResultSet::Random and for the time being no seed can be configured there.
+
+0.003    14th December 2012
+
+    Bugfixes:
+    
+    (1) TestDataGenerator.pm line 234: condition used "keys $hash_ref" instead of "keys %hash"
+    
+    (2) TreeUtils.pm line 41: replaced smart match operator ~~ by use of grep to make it work with Perl versions older than 5.10
+
+0.002    05th December 2012
+
+    Bugfixes:
+    
+    (1) Database schema argument was declared optional, but in fact needed, resulting in an error (https://rt.cpan.org/Ticket/Display.html?id=81689)
+
+    (2) Missing install dependencies (https://rt.cpan.org/Ticket/Display.html?id=81687 and https://rt.cpan.org/Ticket/Display.html?id=81685)
+
+    (3) Errors in POD usage section (https://rt.cpan.org/Ticket/Display.html?id=81686) 
 
 0.001    28th October 2012
-         First version, supports Oracle, PostgreSQL and SQLite.
+
+    First version, supports Oracle, PostgreSQL and SQLite.

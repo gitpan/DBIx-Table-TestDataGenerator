@@ -4,10 +4,8 @@ Changes
 ignore.txt
 lib/DBIx/Table/TestDataGenerator.pm
 lib/DBIx/Table/TestDataGenerator/DBDriverUtils.pm
+lib/DBIx/Table/TestDataGenerator/ResultSetWithRandom.pm
 lib/DBIx/Table/TestDataGenerator/TableProbe.pm
-lib/DBIx/Table/TestDataGenerator/TableProbe/Oracle.pm
-lib/DBIx/Table/TestDataGenerator/TableProbe/Postgres.pm
-lib/DBIx/Table/TestDataGenerator/TableProbe/SQLite.pm
 lib/DBIx/Table/TestDataGenerator/TreeUtils.pm
 Makefile.PL
 MANIFEST			This list of files
@@ -16,13 +14,12 @@ META.yml
 README
 SQLite.bat
 t/00-load.t
-t/01_Test_TestDataGenerator.t
-t/02_Test_TestDataGenerator.t
-t/03_Test_TestDataGenerator.t
-t/04_Test_TableProbe.t
-t/05_Test_TreeUtils.t
-t/06_Test_TreeUtils2.t
+t/01DBIC.t
+t/02DataGeneration.t
+t/03TreeHandling.t
+t/04TreeHandling.t
 t/boilerplate.t
+t/db/schema.sql
 xt/manifest.t
 xt/pod-coverage.t
 xt/pod.t
