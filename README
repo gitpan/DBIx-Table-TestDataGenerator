@@ -3,104 +3,132 @@ NAME
     DBMS
 
 VERSION
-    Version 0.0.4
+    Version 0.0.5
 
 SYNOPSIS
             use DBIx::Table::TestDataGenerator;
-        
+
             my $generator = DBIx::Table::TestDataGenerator->new(
-                    dsn                    => $data_source_name,
-                    user                   => $db_user_name,
-                    password               => $db_password,          
-                    table                  => $target_table_name,
+                    dsn                    => 'dbi:Pg:dbname=testdb',
+                    user                   => 'jose',
+                    password               => '1234',
+                    table                  => 'employees',
             );
 
             #simple usage:
             $generator->create_testdata(
-                    target_size            => $target_size,
-                    num_random             => $num_random,            
+                    target_size            => 1000000,
+                    num_random             => 1000,
             );
 
             #extended usage handling a self-reference of the target table:
             $generator->create_testdata(
-                            target_size        => $target_size,
-                            num_random         => $num_random,                
-                            max_tree_depth     => $max_tree_depth,
-                            min_children       => $min_children,
-                            min_roots          => $min_roots,
+                    target_size        => 1000000,
+                    num_random         => 1000,
+                    max_tree_depth     => 8,
+                    min_children       => 2,
+                    min_roots          => 20,
+            );
+
+            #dump test data to a csv file instead
+            $generator->create_testdata(
+                    target_size        => 1000000,
+                    num_random         => 1000,
+                    csv_dir            => '/usr/local/tdg_dump',
             );
 
 DESCRIPTION
-    There is often the need to create test data in database tables, e.g. to
-    test database client performance. The existence of constraints on a
-    table makes it non-trivial to come up with a way to add records to it.
+    The purpose of this module is fuss-free adding of (bulk) test data to
+    database tables and having test data resembling the data already present
+    in the table.
 
-    The current module inspects the tables' constraints and adds a desired
-    number of records. The values of the fields either come from the table
-    itself (possibly incremented to satisfy uniqueness constraints) or from
-    tables referenced by foreign key constraints. The choice of the copied
-    values is random for a number of runs the user can choose, afterwards
-    the values are chosen randomly from a cache, reducing database traffic
-    for performance reasons. One nice thing about this way to construct new
-    records is that the additional data is similar to the data initially
-    present in the table.
+    The current module analyzes the structure of a target table and adds a
+    desired number of records. The column values come either from the table
+    itself (incremented if necessary to satisfy uniqueness constraints) or
+    from tables referenced by foreign key constraints. These values are
+    chosen randomly for a number of runs chosen by the user, and afterwards
+    the values are chosen randomly from a cache containing the already
+    chosen values, thus reducing database traffic for performance reasons.
+    (Even when using the cache, there is some randomness involved since the
+    choices from the different caches are random, too.)
 
     A main goal of the module is to reduce configuration to the absolute
     minimum by automatically determining information about the target table,
-    in particular its constraints. Another goal is to support as many DBMSs
-    as possible, this has been achieved by basing it on DBIx::Class modules.
+    in particular its constraints and if a primary key column is an
+    auto-increment column or not. Another goal is to support as many DBMSs
+    as possible, which has been achieved by basing it on DBIx::Class
+    modules.
 
     In the synopsis, an extended usage has been mentioned. This refers to
     the common case of having a self-reference on a table, i.e. a one-column
     wide foreign key of a table to itself where the referenced column
     constitutes the primary key. Such a parent-child relationship defines a
-    rootless tree and when generating test data it may be useful to have
-    some control over the growth of this tree. One such case is when the
-    parent-child relation represents a navigation tree and a client
-    application processes this structure. In this case, one would like to
-    have a meaningful, balanced tree structure since this corresponds to
-    real-world examples. To control tree creation the parameters
-    max_tree_depth, min_children and min_roots are provided. Note that the
-    nodes are being added in a depth-first manner.
+    forest, i.e. a collection of trees. When generating test data it may be
+    useful to have some control over the growth of the trees. One such case
+    is when the parent-child relation represents a navigation tree and a
+    client application processes this structure. In this case, one would
+    like to have a meaningful, balanced tree structure since this
+    corresponds to real-world examples. To control tree creation the
+    parameters max_tree_depth, min_children and min_roots are provided. The
+    tree nodes are being added in a depth-first, right-to-left manner.
+
+    You can find an example in the "examples" folder. It contains a script
+    example.sql defining and filling some tables in your target database as
+    well as a small program example.pl using the current module.
 
 SUBROUTINES/METHODS
   new
     Arguments:
 
-    *   dsn: required DBI data source name
+    *   dsn: DBI data source name (required)
 
-    *   user: required database user
+    *   user: database user (required)
 
-    *   password: required database user's password
+    *   password: database user's password (required)
 
-    *   table: required name of the target table
+    *   table: name of the target table (required)
+
+    *   on_the_fly_schema_sql: path to an SQL script used to define an
+        in-memory SQLite database. This parameter is only used by the module
+        install to define an in-memory SQLite database to run its test
+        against. (internal, optional)
 
     Return value:
 
     A new TestDataGenerator object
 
   dsn
-    Accessor for the DBI data source name.
+    Read-only accessor for the DBI data source name.
 
   user
-    Accessor for the database user.
+    Read-only accessor for the database user.
 
   password
-    Accessor for the database user's password.
+    Read-only accessor for the database user's password.
 
   table
-    Accessor for the name of the target table.
+    Read-only accessor for the name of the target table.
+
+  on_the_fly_schema_sql
+    Read-only accessor for path to a file containing the definition of the
+    install test database.
+
+  schema
+    Externally read-only accessor for the DBIx::Class schema created from
+    the target database.
 
   create_testdata
     This is the main method, it creates and adds new records to the target
-    table. In case one of the arguments max_tree_depth, min_children or
-    min_roots has been provided, the other two must be provided as well.
+    table resp. dumps the data to a csv file, see below. In case one of the
+    arguments max_tree_depth, min_children or min_roots has been provided,
+    the other two must be provided as well.
 
     Arguments:
 
     *   target_size
 
-        The target number of rows to be reached.
+        The number of rows the target table should have after
+        create_testdata has completed.
 
     *   num_random
 
@@ -115,26 +143,60 @@ SUBROUTINES/METHODS
     *   max_tree_depth
 
         In case of a self-reference, the maximum depth at which new records
-        will be inserted. The minimum value for this parameter is 2.
+        will be inserted, old records could of course be on any level. The
+        minimum value for this parameter is 1, the level of the root nodes.
 
     *   min_children
 
         In case of a self-reference, the minimum number of children each
-        handled parent node will get. A possible exception is the last
-        handled parent node if the execution stops before $min_children
-        child nodes have been added to it.
+        handled parent node will get. The last handled parent node may not
+        get this number of children, of course, if the target number of
+        records is reached before.
 
     *   min_roots
 
-        In case of a self-reference, the minimum number of root elements
-        existing after completion of the call to create_testdata. A record
-        is considered to be a root element if the corresponding parent id is
-        null or equal to the child id.
+        In case of a self-reference, the minimum number of root elements to
+        create. A record is considered to be a root element if the
+        corresponding parent id is null or equal to the child id.
+
+    *   roots_have_null_parent_id
+
+        If true, new root nodes will have NULL as parent id, otherwise the
+        value of their primary key column. Defaults to false. The value
+        should be set according to the convention used in the target table.
+
+    *   csv_dir
+
+        Optional path to a csv file which will contain the test data, no
+        data will be written to the target database in this case. If not
+        defined, changes are applied to the target database.
+
+    *   keep_connection_alive
+
+        Optional parameter defining if the database handle dbh should still
+        be connected after having created the test data, defaults to false.
+        (For some install tests, we need to set it to true since we are
+        using an in-memory database which would otherwise not be accessible
+        for the tests, but this may also be of use in other scenarios.)
+
+    *   transaction_size
+
+        Optional parameter defining a transaction size. In case transactions
+        are not supported, setting the parameter has no effect. If
+        transactions are supported, omitting the parameter resp. setting its
+        value to 0 will result in one big transaction being used.
 
     Returns:
 
     Nothing, only called for the side-effect of adding new records to the
-    target table. (This may change, see the section FURTHER DEVELOPMENT.)
+    target table. (This may change, see the section "FURTHER DEVELOPMENT".)
+
+  disconnect
+    Arguments: none
+
+    Allows to disconnect the connection to the target database in case
+    keep_connection_alive was set to true before when calling
+    create_testdata.
 
 INSTALLATION AND CONFIGURATION
     To install this module, run the following commands:
@@ -145,15 +207,11 @@ INSTALLATION AND CONFIGURATION
             ./Build install
 
 LIMITATIONS
-    *   Currently, the module executes the inserts in one big transaction if
-        the database handle has not set AutoCommit to true, but this will
-        change, see the section FURTHER DEVELOPMENT.
-
     *   Only uniqueness and foreign key constraints are taken into account.
         Constraints such as check constraints, which are very diverse and
         database specific, are not handled (and most probably will not be).
 
-    *   Uniqueness constraints involving only columns which the TableProbe
+    *   Uniqueness constraints involving only columns which the Increment
         class does not know how to increment cannot be handled. Typically,
         all string and numeric data types are supported and the set of
         supported data types is defined by the list provided by the
@@ -162,24 +220,10 @@ LIMITATIONS
         necessary then to at least add a configuration parameter defining
         what time incrementation step to use.
 
-    *   When calling create_testdata, max_tree_depth = 1 should be allowed,
-        too, meaning that all new records will be root records.
-
-    *   Added records that are root node with respect to the self-reference
-        always have the parent id equal to their pkey. It may be that in the
-        case in question the convention is such that root nodes are
-        identified by having the parent id set to NULL.
-
 FURTHER DEVELOPMENT
     *   The current version handles uniqueness constraints by picking out a
         column involved in the constraint and incrementing it appropriately.
         This should be made customizable in future versions.
-
-    *   Support for transactions and specifying transaction sizes will be
-        added.
-
-    *   It will be possible to get the SQL source of all generated inserts
-        without having them executed on the database.
 
     *   Currently one cannot specify a seed for the random selections used
         to define the generated records since the used class
@@ -207,9 +251,6 @@ ACKNOWLEDGEMENTS
 
         Martin J. Evans was the first developer giving me feedback and nice
         bug reports on Version 0.001, thanks a lot!
-
-AUTHOR
-    Jose Diaz Seng, "<josediazseng at gmx.de>"
 
 BUGS
     Please report any bugs or feature requests to
@@ -243,12 +284,17 @@ SUPPORT
 
         <http://search.cpan.org/dist/DBIx-Table-TestDataGenerator/>
 
-LICENSE AND COPYRIGHT
-    Copyright 2012 Jose Diaz Seng.
+AUTHOR
+    Jose Diaz Seng, "<josediazseng at gmx.de>"
 
-    This program is free software; you can redistribute it and/or modify it
-    under the terms of either: the GNU General Public License as published
-    by the Free Software Foundation; or the Artistic License.
+COPYRIGHT AND LICENSE
+    Copyright (C) 2012-2013, Jose Diaz Seng.
 
-    See http://dev.perl.org/licenses/ for more information.
+    This module is free software; you can redistribute it and/or modify it
+    under the same terms as Perl 5.10.0. For more details, see the full text
+    of the licenses in the directory LICENSES.
+
+    This program is distributed in the hope that it will be useful, but
+    without any warranty; without even the implied warranty of
+    merchantability or fitness for a particular purpose.
 

@@ -1,4 +1,5 @@
-package DBIx::Table::TestDataGenerator::ResultSetWithRandom;
+package DBIx::Table::TestDataGenerator::String;
+use Moo;
 
 use strict;
 use warnings;
@@ -8,13 +9,13 @@ $VERSION = eval $VERSION;
 
 use Carp;
 
-use DBIx::Class::Helper::ResultSet::Random;
+sub remove_package_prefix {
+    my ( $self, $pck_name ) = @_;
+    $pck_name =~ s/(?:.*::)?([^:]+)/$1/;
+    return $pck_name;
+}
 
-use parent 'DBIx::Class::ResultSet';
-
-__PACKAGE__->load_components('Helper::ResultSet::Random');
-
-1;    # End of DBIx::Table::TestDataGenerator::ResultSetWithRandom
+1;    # End of DBIx::Table::TestDataGenerator::String
 
 __END__
 
@@ -22,11 +23,19 @@ __END__
 
 =head1 NAME
 
-DBIx::Table::TestDataGenerator::ResultSetWithRandom - Helper class enabling random selections
+DBIx::Table::TestDataGenerator::String - string manipulation
 
 =head1 DESCRIPTION
 
-We do not know at compile time which ResultSet classes will exist. In order to enable making random selections from ResultSet objects, one can bless them into the current class which provides a rand() method. See the usage in L<DBIx::Table::TestDataGenerator::Randomize>.
+This measly utility class collects methods operating purely on strings. I could not find a better place to stuck the sole method in, so here it is.
+
+=head1 SUBROUTINES/METHODS
+
+=head2 remove_package_prefix
+
+Argument: package name.
+
+Returns the last part of the package name.
 
 =head1 AUTHOR
 

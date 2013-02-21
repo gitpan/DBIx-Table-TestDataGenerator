@@ -15,7 +15,7 @@ sub not_in_file_ok {
     while (my $line = <$fh>) {
         while (my ($desc, $regex) = each %regex) {
             if ($line =~ $regex) {
-                push @{$violated{$desc}||=[]}, $.;
+                push @{$violated{$desc}//=[]}, $.;
             }
         }
     }
@@ -50,8 +50,8 @@ TODO: {
   );
 
   module_boilerplate_ok('lib/DBIx/Table/TestDataGenerator.pm');
-  module_boilerplate_ok('lib/DBIx/Table/TestDataGenerator/TableProbe.pm');
-  module_boilerplate_ok('lib/DBIx/Table/TestDataGenerator/TreeUtils.pm');
+  module_boilerplate_ok('lib/DBIx/Table/TestDataGenerator/DBIxSchemaDumper.pm');
+  module_boilerplate_ok('lib/DBIx/Table/TestDataGenerator/Tree.pm');
 
 
 }
